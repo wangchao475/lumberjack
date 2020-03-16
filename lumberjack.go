@@ -170,7 +170,7 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 
 	n, err = l.file.Write(p)
 	l.size += int64(n)
-
+	l.lastWriteDate = time.Now().Day()
 	return n, err
 }
 
