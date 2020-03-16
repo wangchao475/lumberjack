@@ -39,6 +39,7 @@ const (
 	backupTimeFormat = "2006-01-02T15-04-05.000"
 	compressSuffix   = ".gz"
 	defaultMaxSize   = 100
+	rotateDayFormat  = "2006-01-02"
 )
 
 // ensure we always implement io.WriteCloser
@@ -106,6 +107,11 @@ type Logger struct {
 	// Compress determines if the rotated log files should be compressed
 	// using gzip. The default is not to perform compression.
 	Compress bool `json:"compress" yaml:"compress"`
+	// 是否按天切换日志
+	RotateDayOn bool `json:"rotate_every_day" yaml:"rotate_every_day"`
+
+	// 最后一次write的日期，只保存两位日数据
+	lastWriteDate int
 
 	size int64
 	file *os.File
@@ -148,7 +154,14 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 			return 0, err
 		}
 	}
-
+	currentDay := time.Now().Day()
+	if l.RotateDayOn == true {
+		if currentDay != l.lastWriteDate {
+			if err := l.rotate(); err != nil {
+				return 0, err
+			}
+		}
+	}
 	if l.size+writeLen > l.max() {
 		if err := l.rotate(); err != nil {
 			return 0, err
@@ -218,7 +231,7 @@ func (l *Logger) openNew() error {
 		// Copy the mode off the old logfile.
 		mode = info.Mode()
 		// move the existing file
-		newname := backupName(name, l.LocalTime)
+		newname := backupName(name, l.LocalTime, l.RotateDayOn)
 		if err := os.Rename(name, newname); err != nil {
 			return fmt.Errorf("can't rename log file: %s", err)
 		}
@@ -244,7 +257,7 @@ func (l *Logger) openNew() error {
 // backupName creates a new filename from the given name, inserting a timestamp
 // between the filename and the extension, using the local time if requested
 // (otherwise UTC).
-func backupName(name string, local bool) string {
+func backupName(name string, local bool, rotateDayon bool) string {
 	dir := filepath.Dir(name)
 	filename := filepath.Base(name)
 	ext := filepath.Ext(filename)
@@ -253,8 +266,12 @@ func backupName(name string, local bool) string {
 	if !local {
 		t = t.UTC()
 	}
-
-	timestamp := t.Format(backupTimeFormat)
+	var timestamp string
+	if rotateDayon == true {
+		timestamp = t.Format(rotateDayFormat)
+	} else {
+		timestamp = t.Format(backupTimeFormat)
+	}
 	return filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, timestamp, ext))
 }
 
