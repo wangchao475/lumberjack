@@ -155,6 +155,7 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 		}
 	}
 	currentDay := time.Now().Day()
+
 	if l.lastWriteDate == 0 {
 		l.lastWriteDate = currentDay
 	}
