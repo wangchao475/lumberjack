@@ -269,11 +269,15 @@ func backupName(name string, local bool, rotateDayon bool) string {
 	if !local {
 		t = t.UTC()
 	}
+	//将当前日志改为前一天日期
+	d, _ := time.ParseDuration("-24h")
+	d1 := t.Add(d)
+	//end
 	var timestamp string
 	if rotateDayon == true {
-		timestamp = t.Format(rotateDayFormat)
+		timestamp = d1.Format(rotateDayFormat)
 	} else {
-		timestamp = t.Format(backupTimeFormat)
+		timestamp = d1.Format(backupTimeFormat)
 	}
 	return filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, timestamp, ext))
 }
