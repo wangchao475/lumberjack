@@ -310,7 +310,6 @@ func backupNameNew(name string, local bool, rotateDayon bool, isMaxFile bool) st
 		_, err := os_Stat(newname)
 		if os.IsNotExist(err) {
 			//文件不存在
-			fmt.Printf("newfile name is :", newname)
 			break
 		}
 		newname = filepath.Join(dir, fmt.Sprintf("%s-%s.%d%s", prefix, timestamp, n, ext))
