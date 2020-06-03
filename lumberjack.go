@@ -160,13 +160,13 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 	}
 	if l.RotateDayOn == true {
 		if currentDay != l.lastWriteDate {
-			if err := l.rotate(); err != nil {
+			if err := l.rotate(false); err != nil {
 				return 0, err
 			}
 		}
 	}
 	if l.size+writeLen > l.max() {
-		if err := l.rotate(); err != nil {
+		if err := l.rotate(true); err != nil {
 			return 0, err
 		}
 	}
@@ -202,17 +202,17 @@ func (l *Logger) close() error {
 func (l *Logger) Rotate() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.rotate()
+	return l.rotate(true) //默认文件保存为当前时间，所以设置为true
 }
 
 // rotate closes the current file, moves it aside with a timestamp in the name,
 // (if it exists), opens a new file with the original filename, and then runs
 // post-rotation processing and removal.
-func (l *Logger) rotate() error {
+func (l *Logger) rotate(isMaxFile bool) error {
 	if err := l.close(); err != nil {
 		return err
 	}
-	if err := l.openNew(); err != nil {
+	if err := l.openNew(isMaxFile); err != nil {
 		return err
 	}
 	l.mill()
@@ -221,7 +221,7 @@ func (l *Logger) rotate() error {
 
 // openNew opens a new log file for writing, moving any old log file out of the
 // way.  This methods assumes the file has already been closed.
-func (l *Logger) openNew() error {
+func (l *Logger) openNew(isMaxFile bool) error {
 	err := os.MkdirAll(l.dir(), 0755)
 	if err != nil {
 		return fmt.Errorf("can't make directories for new logfile: %s", err)
@@ -234,11 +234,10 @@ func (l *Logger) openNew() error {
 		// Copy the mode off the old logfile.
 		mode = info.Mode()
 		// move the existing file
-		newname := backupName(name, l.LocalTime, l.RotateDayOn)
+		newname := backupNameNew(name, l.LocalTime, l.RotateDayOn, isMaxFile)
 		if err := os.Rename(name, newname); err != nil {
 			return fmt.Errorf("can't rename log file: %s", err)
 		}
-
 		// this is a no-op anywhere but linux
 		if err := chown(name, info); err != nil {
 			return err
@@ -280,6 +279,49 @@ func backupName(name string, local bool, rotateDayon bool) string {
 		timestamp = d1.Format(backupTimeFormat)
 	}
 	return filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, timestamp, ext))
+}
+func backupNameNew(name string, local bool, rotateDayon bool, isMaxFile bool) string {
+	dir := filepath.Dir(name)
+	filename := filepath.Base(name)
+	ext := filepath.Ext(filename)
+	prefix := filename[:len(filename)-len(ext)]
+	t := currentTime()
+	if !local {
+		t = t.UTC()
+	}
+	var timestamp string
+	if isMaxFile == true {
+		//因为文件大小切换，取当天时间
+		if rotateDayon == true {
+			timestamp = t.Format(rotateDayFormat)
+		} else {
+			timestamp = t.Format(backupTimeFormat)
+		}
+	} else {
+		//因为跨天切换，取前一天时间
+		//将当前日志改为前一天日期
+		d, _ := time.ParseDuration("-24h")
+		d1 := t.Add(d)
+		if rotateDayon == true {
+			timestamp = d1.Format(rotateDayFormat)
+		} else {
+			timestamp = d1.Format(backupTimeFormat)
+		}
+	}
+
+	newname := filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, timestamp, ext))
+	n := 1
+	for {
+		_, err := os_Stat(newname)
+		if os.IsNotExist(err) {
+			//文件不存在
+			fmt.Printf("newfile name is :", newname)
+			break
+		}
+		newname = filepath.Join(dir, fmt.Sprintf("%s-%s%s.%d", prefix, timestamp, ext, n))
+		n++
+	}
+	return newname
 }
 
 // openExistingOrNew opens the logfile if it exists and if the current write
