@@ -268,15 +268,11 @@ func backupName(name string, local bool, rotateDayon bool) string {
 	if !local {
 		t = t.UTC()
 	}
-	//将当前日志改为前一天日期
-	d, _ := time.ParseDuration("-24h")
-	d1 := t.Add(d)
-	//end
 	var timestamp string
 	if rotateDayon == true {
-		timestamp = d1.Format(rotateDayFormat)
+		timestamp = t.Format(rotateDayFormat)
 	} else {
-		timestamp = d1.Format(backupTimeFormat)
+		timestamp = t.Format(backupTimeFormat)
 	}
 	return filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, timestamp, ext))
 }
@@ -291,7 +287,7 @@ func backupNameNew(name string, local bool, rotateDayon bool, isMaxFile bool) st
 	}
 	var timestamp string
 	if isMaxFile == true {
-		//因为文件大小切换，取当天时间
+		//因为文件大小切换，取当天时间---
 		if rotateDayon == true {
 			timestamp = t.Format(rotateDayFormat)
 		} else {
@@ -333,21 +329,21 @@ func (l *Logger) openExistingOrNew(writeLen int) error {
 	filename := l.filename()
 	info, err := os_Stat(filename)
 	if os.IsNotExist(err) {
-		return l.openNew()
+		return l.openNew(true)
 	}
 	if err != nil {
 		return fmt.Errorf("error getting log file info: %s", err)
 	}
 
 	if info.Size()+int64(writeLen) >= l.max() {
-		return l.rotate()
+		return l.rotate(true)
 	}
 
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		// if we fail to open the old log file for some reason, just ignore
 		// it and open a new log file.
-		return l.openNew()
+		return l.openNew(true)
 	}
 	l.file = file
 	l.size = info.Size()
