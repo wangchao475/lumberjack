@@ -314,7 +314,7 @@ func backupNameNew(name string, local bool, rotateDayon bool, isMaxFile bool) st
 			fmt.Printf("newfile name is :", newname)
 			break
 		}
-		newname = filepath.Join(dir, fmt.Sprintf("%s-%s%s.%d", prefix, timestamp, ext, n))
+		newname = filepath.Join(dir, fmt.Sprintf("%s-%s.%d%s", prefix, timestamp, n, ext))
 		n++
 	}
 	return newname
